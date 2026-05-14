@@ -507,23 +507,34 @@ async function fetchAiInsight(){
     const fixAmt=t=>t.replace(/(\d+)천원/g,(_,n)=>parseInt(n)*1000+'원 ');
     const fixed=fixAmt(text);
     // 인사이트 바 업데이트
-    const sections=fixed.split(/\n(?=\*\*[✅⚠️🎯])/);
+    // 수정: 이모지 멀티바이트 문제 → \*\* 기준으로 split (더 안정적)
+    const sections=fixed.split(/\n(?=\*\*)/);
     let topHtml='',botHtml='',actHtml='';
     sections.forEach(sec=>{
       const lines=sec.trim().split('\n').filter(l=>l.trim());
       if(!lines.length)return;
       const title=lines[0].replace(/\*\*/g,'').trim();
+      // 우수/개선/할일 판별: 이모지 포함 여부도 함께 체크
+      const isTop=title.includes('우수')||title.includes('\u2705');
+      const isBot=title.includes('개선')||title.includes('\u26a0');
+      const isAct=title.includes('할 일')||title.includes('액션')||title.includes('\uD83C\uDFAF');
       const items=lines.slice(1).filter(l=>/^[•\-\*]/.test(l.trim()));
-      const body=items.map(l=>{const t=l.replace(/^[•\-\*]\s*/,'');const[pl,...rest]=t.split(':');return`<div style="margin-bottom:5px"><strong>${pl.trim()}</strong>${rest.length?': '+rest.join(':').trim():''}</div>`;}).join('');
-      if(title.includes('우수'))topHtml=`<div style="background:#F0FDF4;border:.5px solid #86EFAC;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#166534;margin-bottom:5px">${title}</div><div style="color:#166534">${body}</div></div>`;
-      else if(title.includes('개선'))botHtml=`<div style="background:#FFF1F2;border:.5px solid #FCA5A5;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#991B1B;margin-bottom:5px">${title}</div><div style="color:#991B1B">${body}</div></div>`;
-      else if(title.includes('할 일')||title.includes('액션')){const desc=lines.slice(1).filter(l=>l.trim()&&!/^[•\-\*]/.test(l.trim())).join(' ').trim()||items.map(l=>l.replace(/^[•\-\*]\s*/,'')).join(' ');actHtml=`<div style="background:#EFF6FF;border:.5px solid #93C5FD;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#1E40AF;margin-bottom:5px">${title}</div><div style="color:#1D4ED8">${fixAmt(desc)}</div></div>`;}
+      const body=items.length
+        ? items.map(l=>{const t=l.replace(/^[•\-\*]\s*/,'');const[pl,...rest]=t.split(':');return`<div style="margin-bottom:5px"><strong>${pl.trim()}</strong>${rest.length?': '+rest.join(':').trim():''}</div>`;}).join('')
+        : lines.slice(1).map(l=>`<div style="margin-bottom:4px">${l.trim()}</div>`).join('');
+      if(isTop)topHtml=`<div style="background:#F0FDF4;border:.5px solid #86EFAC;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#166534;margin-bottom:5px">${title}</div><div style="color:#166534">${body}</div></div>`;
+      else if(isBot)botHtml=`<div style="background:#FFF1F2;border:.5px solid #FCA5A5;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#991B1B;margin-bottom:5px">${title}</div><div style="color:#991B1B">${body}</div></div>`;
+      else if(isAct){const desc=lines.slice(1).filter(l=>l.trim()&&!/^[•\-\*]/.test(l.trim())).join(' ').trim()||items.map(l=>l.replace(/^[•\-\*]\s*/,'')).join(' ');actHtml=`<div style="background:#EFF6FF;border:.5px solid #93C5FD;border-radius:6px;padding:10px 12px"><div style="font-size:10px;font-weight:600;color:#1E40AF;margin-bottom:5px">${title}</div><div style="color:#1D4ED8">${fixAmt(desc)||body}</div></div>`;}
     });
+    // 파싱 결과 없으면 전체 텍스트를 fallback으로 표시
+    if(!topHtml&&!botHtml&&!actHtml){
+      topHtml=`<div style="background:#F0FDF4;border:.5px solid #86EFAC;border-radius:6px;padding:10px 12px;grid-column:1/-1"><div style="color:#166534;font-size:11px;white-space:pre-line">${fixed}</div></div>`;
+    }
     const bar=document.getElementById('insightBar');
     const content=document.getElementById('insightContent');
     const period=document.getElementById('insightPeriod');
     if(bar&&content){
-      period.textContent='('+recent.map(w=>wkLbl(w)).join(', ')+')';
+      if(period)period.textContent='('+recent.map(w=>wkLbl(w)).join(', ')+')';
       bar.style.display='block';
       content.innerHTML=`<div>${topHtml}</div><div>${botHtml}</div><div>${actHtml}</div>`;
       bar.scrollIntoView({behavior:'smooth',block:'center'});
