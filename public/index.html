@@ -558,7 +558,7 @@ function renderInsightBar(sWks){
   const bar=document.getElementById('insightBar');const content=document.getElementById('insightContent');const period=document.getElementById('insightPeriod');
   if(!bar||!content)return;
   const allWks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
-  const recent=(sWks&&sWks.length>0)?[...new Set([...sWks])].sort().slice(-3):allWks.slice(-3);
+  const recent=(sWks&&sWks.length>0)?[...new Set([...sWks])].sort():allWks.slice(-3);
   if(!recent.length){bar.style.display='none';return;}
 
   // 전주차 구하기 (recent 중 가장 이른 주의 바로 이전)
