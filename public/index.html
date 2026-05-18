@@ -561,20 +561,102 @@ function renderInsightBar(sWks){
   const allWks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
   const recent=(sWks&&sWks.length>0)?[...new Set([...sWks])].sort().slice(-3):allWks.slice(-3);
   if(!recent.length){bar.style.display='none';return;}
+
+  // 전주차 구하기 (recent 중 가장 이른 주의 바로 이전)
+  const firstWk=recent[0];
+  const firstIdx=allWks.indexOf(firstWk);
+  const prevWk=firstIdx>0?allWks[firstIdx-1]:null;
+
   const PNAME={alwayz:'올웨이즈',ssg:'SSG',gs:'GS홈쇼핑',kurly:'컬리',lotte_ai:'롯데ON AI',lotte_cpc:'롯데ON CPC',toss_ai:'토스 AI',toss_cpc:'토스 CPC',ohouse:'오늘의집',ali:'알리'};
+
+  // 현재 기간 집계
   const stats={};
-  recent.forEach(wk=>{Object.entries(D[wk]?.platforms||{}).forEach(([k,v])=>{if(!v||!v.adCost)return;if(!stats[k])stats[k]={roas:[],adCost:0,sales:0,ctr:[]};stats[k].roas.push(v.roas);stats[k].adCost+=v.adCost;stats[k].sales+=v.sales;if(v.ctr)stats[k].ctr.push(v.ctr);});});
+  recent.forEach(wk=>{Object.entries(D[wk]?.platforms||{}).forEach(([k,v])=>{
+    if(!v||!v.adCost)return;
+    if(!stats[k])stats[k]={roas:[],adCost:0,sales:0,ctr:[],clicks:0};
+    if(v.roas!=null&&!isNaN(v.roas))stats[k].roas.push(v.roas);
+    stats[k].adCost+=v.adCost;stats[k].sales+=v.sales;stats[k].clicks+=v.clicks||0;
+    if(v.ctr)stats[k].ctr.push(v.ctr);
+  });});
+
+  // 전주 집계
+  const prevStats={};
+  if(prevWk){Object.entries(D[prevWk]?.platforms||{}).forEach(([k,v])=>{
+    if(!v||!v.adCost)return;
+    prevStats[k]={adCost:v.adCost,sales:v.sales,roas:v.roas||0};
+  });}
+
   const avg=arr=>arr.length?Math.round(arr.reduce((a,b)=>a+b)/arr.length):0;
-  const ranked=Object.entries(stats).filter(([,s])=>s.roas.length>0&&s.adCost>50000).map(([k,s])=>({k,name:PNAME[k]||k,avgRoas:avg(s.roas),adCost:s.adCost,sales:s.sales,roasTrend:s.roas.length>1?s.roas[s.roas.length-1]-s.roas[0]:0,avgCtr:s.ctr.length?parseFloat((s.ctr.reduce((a,b)=>a+b)/s.ctr.length).toFixed(2)):null})).sort((a,b)=>b.avgRoas-a.avgRoas);
+  const fmt=n=>n>=10000?Math.round(n/10000)+'만':Math.round(n/1000)+'천';
+  const diff=(a,b)=>b>0?Math.round((a-b)/b*100):0;
+
+  const ranked=Object.entries(stats).filter(([,s])=>s.roas.length>0&&s.adCost>50000).map(([k,s])=>{
+    const curRoas=avg(s.roas);
+    const prev=prevStats[k];
+    const roasDiff=prev?curRoas-prev.roas:null;
+    const adCostDiff=prev?diff(s.adCost,prev.adCost):null;
+    const salesDiff=prev?diff(s.sales,prev.sales):null;
+    const avgCtr=s.ctr.length?parseFloat((s.ctr.reduce((a,b)=>a+b)/s.ctr.length).toFixed(2)):null;
+    return{k,name:PNAME[k]||k,curRoas,roasDiff,adCost:s.adCost,sales:s.sales,adCostDiff,salesDiff,avgCtr};
+  }).sort((a,b)=>b.curRoas-a.curRoas);
+
   if(!ranked.length){bar.style.display='none';return;}
-  const top=ranked.slice(0,3);const bot=ranked.filter(p=>p.avgRoas<700).slice(-2).reverse();
-  const actions={toss_cpc:'예산 10~20% 축소 후 효율 재측정',toss_ai:'소재 교체 및 타겟 재검토',ali:'고ROAS 상품 집중, 저효율 상품 중단',kurly:'예산 축소 테스트',lotte_cpc:'입찰가·키워드 정리',lotte_ai:'소재 리프레시',gs:'광고 기간·상품 점검',ssg:'현행 유지 or 소폭 증액',ohouse:'효율 우수 — 예산 증액 검토',alwayz:'안정적 운영 유지'};
-  period.textContent='('+recent.map(w=>wkLbl(w)).join(', ')+')';bar.style.display='block';
-  const topHtml=top.map(p=>`<div style="background:#F0FDF4;border:.5px solid #86EFAC;border-radius:6px;padding:8px 10px;margin-bottom:6px"><div style="font-size:10px;color:#166534;font-weight:600">✅ ${p.name}</div><div style="font-size:12px;font-weight:700;color:#15803D">ROAS ${p.avgRoas}%</div><div style="font-size:10px;color:#166534">${Math.round(p.adCost/10000)}만→${Math.round(p.sales/10000)}만 매출${p.avgCtr?' · CTR '+p.avgCtr+'%':''}</div></div>`).join('');
-  const botHtml=bot.map(p=>`<div style="background:#FFF1F2;border:.5px solid #FCA5A5;border-radius:6px;padding:8px 10px;margin-bottom:6px"><div style="font-size:10px;color:#991B1B;font-weight:600">⚠️ ${p.name}</div><div style="font-size:12px;font-weight:700;color:#B91C1C">ROAS ${p.avgRoas}%</div><div style="font-size:10px;color:#991B1B">→ ${actions[p.k]||'점검 권장'}</div></div>`).join('');
-  const best=ranked[0];const worst=ranked.filter(p=>p.avgRoas<600)[0];
-  const actHtml=`<div style="background:#EFF6FF;border:.5px solid #93C5FD;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#1E40AF;font-weight:600">🎯 다음 주 액션</div><div style="font-size:11px;color:#1D4ED8;font-weight:500;margin-top:3px">${best.name} 예산 증액 검토</div><div style="font-size:10px;color:#1E40AF">${worst?worst.name+' 예산 축소로 전체 ROAS 개선 가능':'현행 예산 배분 유지'}</div></div>`;
-  content.innerHTML=`<div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">TOP 플랫폼</div>${topHtml}</div><div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">개선 필요</div>${botHtml||'<div style="font-size:11px;color:var(--text3)">모든 플랫폼 양호</div>'}</div><div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">추천 액션</div>${actHtml}</div>`;
+
+  const trendTag=(v,unit='%')=>v==null?'':`<span style="font-size:9px;color:${v>0?'#16a34a':'#dc2626'}">${v>0?'▲':'▼'}${Math.abs(v)}${unit}</span>`;
+
+  const actions={
+    toss_cpc:'예산 10~20% 축소 후 효율 재측정',toss_ai:'소재 교체 및 타겟 재검토',
+    ali:'고ROAS 상품 집중, 저효율 상품 중단',kurly:'예산 축소 테스트',
+    lotte_cpc:'입찰가·키워드 정리',lotte_ai:'소재 리프레시',
+    gs:'광고 기간·상품 점검',ssg:'현행 유지 or 소폭 증액',
+    ohouse:'효율 우수 — 예산 증액 검토',alwayz:'안정적 운영 유지'
+  };
+
+  const top=ranked.slice(0,3);
+  const bot=ranked.filter(p=>p.curRoas<700).slice(-2).reverse();
+  const best=ranked[0];
+  const worst=ranked.filter(p=>p.curRoas<600)[0];
+
+  const topHtml=top.map(p=>`
+    <div style="background:#F0FDF4;border:.5px solid #86EFAC;border-radius:6px;padding:8px 10px;margin-bottom:6px">
+      <div style="font-size:10px;color:#166534;font-weight:600">✅ ${p.name}</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:12px;font-weight:700;color:#15803D">ROAS ${p.curRoas}%</span>
+        ${trendTag(p.roasDiff,'%p')}
+      </div>
+      <div style="font-size:10px;color:#166534">
+        광고비 ${fmt(p.adCost)} ${trendTag(p.adCostDiff)} · 매출 ${fmt(p.sales)} ${trendTag(p.salesDiff)}
+        ${p.avgCtr?' · CTR '+p.avgCtr+'%':''}
+      </div>
+    </div>`).join('');
+
+  const botHtml=bot.map(p=>`
+    <div style="background:#FFF1F2;border:.5px solid #FCA5A5;border-radius:6px;padding:8px 10px;margin-bottom:6px">
+      <div style="font-size:10px;color:#991B1B;font-weight:600">⚠️ ${p.name}</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:12px;font-weight:700;color:#B91C1C">ROAS ${p.curRoas}%</span>
+        ${trendTag(p.roasDiff,'%p')}
+      </div>
+      <div style="font-size:10px;color:#991B1B">
+        광고비 ${fmt(p.adCost)} ${trendTag(p.adCostDiff)} · 매출 ${fmt(p.sales)} ${trendTag(p.salesDiff)}
+      </div>
+      <div style="font-size:10px;color:#991B1B;margin-top:3px">→ ${actions[p.k]||'점검 권장'}</div>
+    </div>`).join('');
+
+  const actHtml=`
+    <div style="background:#EFF6FF;border:.5px solid #93C5FD;border-radius:6px;padding:8px 10px">
+      <div style="font-size:10px;color:#1E40AF;font-weight:600">🎯 다음 주 액션</div>
+      <div style="font-size:11px;color:#1D4ED8;font-weight:500;margin-top:3px">${best.name} 예산 증액 검토</div>
+      <div style="font-size:10px;color:#1E40AF;margin-top:2px">${worst?worst.name+' 예산 축소로 전체 ROAS 개선 가능':'현행 예산 배분 유지'}</div>
+      ${ranked.some(p=>p.roasDiff!=null&&p.roasDiff<-50)?`<div style="font-size:10px;color:#dc2626;margin-top:2px">⚠️ ${ranked.filter(p=>p.roasDiff!=null&&p.roasDiff<-50).map(p=>p.name).join(', ')} ROAS 급락 — 즉시 점검 필요</div>`:''}
+    </div>`;
+
+  period.textContent='('+recent.map(w=>wkLbl(w)).join(', ')+')';
+  bar.style.display='block';
+  content.innerHTML=`
+    <div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">TOP 플랫폼</div>${topHtml}</div>
+    <div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">개선 필요</div>${botHtml||'<div style="font-size:11px;color:var(--text3)">모든 플랫폼 양호</div>'}</div>
+    <div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:6px">추천 액션</div>${actHtml}</div>`;
 }
 
 document.addEventListener('click',ev=>{const p=document.getElementById('aiPanel');if(p&&p.style.display==='block'&&!p.contains(ev.target)&&!ev.target.closest('.btn')){p.style.display='none';}});
