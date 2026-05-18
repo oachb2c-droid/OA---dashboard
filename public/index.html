@@ -177,7 +177,7 @@ tfoot td:first-child{text-align:left}
     <span id="wkCnt" style="font-size:11px;color:var(--text3)"></span>
   </div>
 
-  <div class="clog" id="clog"></div>
+  <div id="clog_body"></div>
 
   <!-- AI 인사이트 바 -->
   <div id="insightBar" style="display:none;margin:12px 0;background:var(--bg);border:.5px solid var(--border);border-radius:var(--r);padding:14px 16px">
@@ -583,58 +583,118 @@ function renderInsightBar(sWks){
 
 document.addEventListener('click',ev=>{const p=document.getElementById('aiPanel');if(p&&p.style.display==='block'&&!p.contains(ev.target)&&!ev.target.closest('.btn')){p.style.display='none';}});
 
-/* ── 자동수집 ── */
+/* ── 자동수집 모달 ── */
 function addLog(msg,type='run'){
   logs.push({msg,type});
-  const el=document.getElementById('clog');el.classList.add('show');
-  el.innerHTML=logs.map(l=>`<div class="cl c${l.type}"><i class="ti ${l.type==='done'?'ti-check':l.type==='err'?'ti-alert-circle':'ti-loader'}" style="font-size:11px"></i>${l.msg}</div>`).join('');
+  const el=document.getElementById('clog');
+  if(!el)return;
+  el.innerHTML=logs.map(l=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:.5px solid #e5e7eb"><span>${l.type==='done'?'✅':l.type==='err'?'❌':'⏳'}</span><span style="font-size:11px">${l.msg}</span></div>`).join('');
+  el.scrollTop=el.scrollHeight;
 }
 
-async function startCollect(){
-  if(collecting)return;
+function buildCollectPrompt(L,H){
+  const d=new Date(L);
+  const jan1=new Date(d.getFullYear(),0,1);
+  const wk=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  const weekKey=d.getFullYear()+'-W'+String(wk).padStart(2,'0');
+  return `광고 플랫폼 6개에서 기간 ${L} ~ ${H} 데이터를 수집하고 대시보드에 직접 저장해줘.
+
+각 플랫폼 수집 후 대시보드 탭(https://oa-dashboard-8bwy.onrender.com/)으로 이동해서 F12 콘솔에서 실행:
+savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impressions:숫자, clicks:숫자, cpc:숫자, ctr:숫자});
+금액: 원 단위 숫자만(콤마없이) / ctr: % 숫자만(예:1.23) / 없는 항목은 0
+
+【1. 올웨이즈 CPS】 https://www.alwayzadcenter.com/report → "alwayz"
+【2. SSG AI】 https://ad.ssg.com → "ssg"
+【3. GS홈쇼핑 AI】 https://seller.gsshop.com → "gs"
+【4. 컬리 AI】 https://ad.kurly.com → "kurly"
+【5. 롯데ON AI】 https://ad.lotteon.com/advRpt/advSadRptDay → "lotte_ai"
+【6. 롯데ON CPC】 https://ad.lotteon.com/advRpt/advClickRptDay → "lotte_cpc"
+
+6개 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
+}
+
+function openCollectModal(){
   if(!rS||!rE){toast('날짜 범위를 먼저 선택해주세요','err');return;}
   const L=lo(),H=hi();
   const wks=rngWks(L,H);
-
-  // 이미 수집된 주차 확인 → 건너뜀
-  const done=wks.every(wk=>{const p=D[wk]?.platforms;return p?.lotte_ai&&p?.lotte_cpc;});
-  if(done){toast(`롯데ON 데이터 이미 수집됨 — 건너뜀`,'ok');return;}
-
-  collecting=true;logs=[];
-  const btn=document.getElementById('coBtn');
-  btn.className='btn btn-co run';
-  btn.innerHTML='<i class="ti ti-loader"></i>수집 중...';
-
-  addLog(`수집 기간: ${L} ~ ${H}`,'done');
-  addLog('롯데ON AI + CPC 수집 요청 전달 중...','run');
-
-  collecting=false;
-  btn.className='btn btn-co';
-  btn.innerHTML='<i class="ti ti-refresh"></i>자동 수집 ↗';
-  renderAll();
-
-  // Claude 채팅으로 수집 요청
-  // (실제 환경에선 브라우저 자동화로 처리)
-  const msg=`롯데ON 광고주센터에서 아래 2개 페이지 데이터 수집해줘 (기간: ${L} ~ ${H})\n\n1. 스마트매출업 리포트: https://ad.lotteon.com/advRpt/advSadRptDay\n2. 클릭광고 리포트: https://ad.lotteon.com/advRpt/advClickRptDay\n\n각 페이지에서 저번주 버튼 클릭 → 적용 → 조회 → 합계행 파싱해서 자동 저장해줘`;
-  addLog('Claude 브라우저 탭에서 수집 시작 ↗','done');
-  if(typeof sendLotteonCollectRequest==='function') sendLotteonCollectRequest(L,H);
+  const platforms=[
+    {key:'alwayz',name:'올웨이즈 CPS'},
+    {key:'ssg',name:'SSG AI'},
+    {key:'gs',name:'GS홈쇼핑 AI'},
+    {key:'kurly',name:'컬리 AI'},
+    {key:'lotte_ai',name:'롯데ON AI'},
+    {key:'lotte_cpc',name:'롯데ON CPC'},
+  ];
+  const statusHtml=platforms.map(pl=>{
+    const hasDat=wks.some(wk=>D[wk]?.platforms?.[pl.key]);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid #e5e7eb">
+      <span>${hasDat?'✅':'⬜'}</span>
+      <span style="font-size:12px;color:#111827">${pl.name}</span>
+      <span style="font-size:11px;color:${hasDat?'#16a34a':'#dc2626'};margin-left:auto">${hasDat?'수집됨':'미수집'}</span>
+    </div>`;
+  }).join('');
+  const prompt=buildCollectPrompt(L,H);
+  const existing=document.getElementById('collectModal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='collectModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow:auto;padding:20px 22px;box-shadow:0 8px 32px rgba(0,0,0,.35)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:#111827">🤖 자동수집 — Claude MCP</div>
+        <button onclick="document.getElementById('collectModal').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#6b7280">✕</button>
+      </div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:10px">기간: <b style="color:#111827">${L} ~ ${H}</b> (${wks.length}주차)</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">수집 현황</div>
+      <div style="margin-bottom:14px">${statusHtml}</div>
+      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">① 프롬프트 복사 → Claude MCP에 붙여넣기</div>
+      <div style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:10px;font-size:10px;color:#374151;white-space:pre-wrap;max-height:140px;overflow:auto;margin-bottom:8px;line-height:1.5">${prompt.replace(/</g,'&lt;')}</div>
+      <button id="copyPromptBtn" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:14px">📋 프롬프트 복사</button>
+      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">② 수집 로그</div>
+      <div id="clog" style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:8px;max-height:120px;overflow-y:auto;min-height:40px;font-size:11px">
+        <div style="color:#9ca3af">Claude MCP 수집 완료 후 자동으로 로그가 표시됩니다.</div>
+      </div>
+    </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+  logs=[];
+  const copyBtn=document.getElementById('copyPromptBtn');
+  if(copyBtn){
+    copyBtn.addEventListener('click',()=>{
+      navigator.clipboard.writeText(prompt).then(()=>{
+        copyBtn.textContent='✅ 복사됨!';
+        setTimeout(()=>{copyBtn.textContent='📋 프롬프트 복사';},1500);
+      }).catch(()=>{
+        const ta=document.createElement('textarea');
+        ta.value=prompt;ta.style.cssText='position:fixed;opacity:0';
+        document.body.appendChild(ta);ta.select();document.execCommand('copy');
+        document.body.removeChild(ta);
+        copyBtn.textContent='✅ 복사됨!';
+        setTimeout(()=>{copyBtn.textContent='📋 프롬프트 복사';},1500);
+      });
+    });
+  }
 }
 
-// 수집 완료 후 저장 (브라우저 자동화에서 호출)
-function saveLotteon(weekKey, ai, cpc){
-  if(!D[weekKey]) D[weekKey]={label:wkLbl(weekKey),platforms:{}};
+function savePlatformData(weekKey,platformKey,data){
+  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
+  D[weekKey].platforms[platformKey]=data;
+  save();renderAll();
+  addLog(`${weekKey} ${platformKey} 저장 완료`,'done');
+  toast(`${platformKey} 저장 완료`,'ok');
+}
+window.savePlatformData=savePlatformData;
+
+async function startCollect(){
+  openCollectModal();
+}
+
+function saveLotteon(weekKey,ai,cpc){
+  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
   const p=D[weekKey].platforms;
-  if(!p.lotte_ai&&ai)  p.lotte_ai=ai;
+  if(!p.lotte_ai&&ai)p.lotte_ai=ai;
   if(!p.lotte_cpc&&cpc)p.lotte_cpc=cpc;
-  if(!p.alwayz) p.alwayz=null;
-  if(!p.ssg)    p.ssg=null;
-  if(!p.gs)     p.gs=null;
-  if(!p.kurly)  p.kurly=null;
-  if(!p.toss_ai)  p.toss_ai=null;
-  if(!p.toss_cpc) p.toss_cpc=null;
-  if(!p.ohouse) p.ohouse=null;
-  if(!p.toss)   p.toss=null;
-  if(!p.ali)    p.ali=null;
   save();toast(`${weekKey} 롯데ON 저장 완료`,'ok');renderAll();
 }
 window.saveLotteon=saveLotteon;
