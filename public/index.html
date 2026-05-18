@@ -301,8 +301,16 @@ const hi=()=>rS&&rE?(rS<=rE?rE:rS):null;
 function load(){
   // Render 환경: Supabase에서 불러오기
   if(window.location.protocol!=='file:'&&window.location.hostname!=='localhost'){
+    // 먼저 HTML 내장 데이터로 기본값 세팅
+    try{const el=document.getElementById('__DATA__');const base=el&&el.textContent.trim()?JSON.parse(el.textContent):{};D=base;}catch(e){D={};}
     fetch('/api/data').then(r=>r.json()).then(data=>{
-      D=data||{};
+      // Supabase 데이터로 덮어쓰기 (병합)
+      Object.entries(data||{}).forEach(([wk,val])=>{
+        if(!D[wk])D[wk]={label:val.label,platforms:{}};
+        // platforms 병합: Supabase 값 우선, 없는 키는 기존 유지
+        D[wk].platforms=Object.assign({},D[wk].platforms||{},val.platforms||{});
+        D[wk].label=val.label||D[wk].label;
+      });
       const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
       if(!curWk||!D[curWk])curWk=wks[wks.length-1];
       if(!rS&&curWk){const{start,end}=wkDates(curWk);rS=d2s(start);rE=d2s(end);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};}
