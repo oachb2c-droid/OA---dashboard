@@ -459,7 +459,7 @@ function openAiPanel(e){
 }
 async function fetchAiInsight(){
   const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
-  const recent=wks.slice(-3);
+  const recent=(rS&&rE)?rngWks(lo(),hi()):wks.slice(-3);
   const PNAME={alwayz:'올웨이즈 CPS',ssg:'SSG AI',gs:'GS홈쇼핑 AI',kurly:'컬리 AI',lotte_ai:'롯데ON AI',lotte_cpc:'롯데ON CPC',toss_ai:'토스 AI',toss_cpc:'토스 CPC',ohouse:'오늘의집 CPC',ali:'알리 CPC'};
   const summary=recent.map(wk=>{
     const p=D[wk]?.platforms||{};
@@ -477,7 +477,7 @@ async function fetchAiInsight(){
   if(!apiKey){
     const msg='💡 Claude API 크레딧 부족 — API 사용 없이 데이터 기반으로 인사이트를 보여드립니다.';
     document.getElementById('aiBody').innerHTML=`<div style="color:var(--text2);font-size:11px">${msg}</div>`;
-    const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort().slice(-3);
+    const wks=(rS&&rE)?rngWks(lo(),hi()):Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort().slice(-3);
     renderInsightBar(wks);
     setTimeout(()=>{
       document.getElementById('aiBody').innerHTML=`<div style="color:var(--text2);font-size:11px">${msg}<br><span style="color:#166534">✓ 아래 인사이트 바에 표시됩니다.</span></div>`;
@@ -546,7 +546,7 @@ async function fetchAiInsight(){
       ? '💡 Claude API 크레딧 부족 — API 사용 없이 데이터 기반으로 인사이트를 보여드립니다.'
       : '💡 API 연결 실패 — 데이터 기반으로 인사이트를 보여드립니다.';
     document.getElementById('aiBody').innerHTML=`<div style="color:var(--text2);font-size:11px">${msg}</div>`;
-    const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort().slice(-3);
+    const wks=(rS&&rE)?rngWks(lo(),hi()):Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort().slice(-3);
     renderInsightBar(wks);
     setTimeout(()=>{
       document.getElementById('aiBody').innerHTML=`<div style="color:var(--text2);font-size:11px">${msg}<br><span style="color:#166534">✓ 아래 인사이트 바에 표시됩니다.</span></div>`;
