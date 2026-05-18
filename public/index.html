@@ -327,14 +327,33 @@ function loadFromHTML(){
   if(!rS&&curWk){const{start,end}=wkDates(curWk);rS=d2s(start);rE=d2s(end);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};}
 }
 function save(){
-  const body={};
-  Object.entries(D).filter(([k])=>/^\d{4}-W\d{2}$/.test(k)).forEach(([k,v])=>{
-    body[k]={label:v.label||'',platforms:v.platforms||{}};
-  });
-  fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(r=>r.json())
-    .then(d=>{if(d.ok)toast('저장 완료','ok');else toast('저장 오류: '+(d.error||'unknown'),'err');})
-    .catch(e=>toast('저장 오류: '+e.message,'err'));
+  const doSave=()=>{
+    const body={};
+    Object.entries(D).filter(([k])=>/^\d{4}-W\d{2}$/.test(k)).forEach(([k,v])=>{
+      body[k]={label:v.label||'',platforms:v.platforms||{}};
+    });
+    fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(r=>r.json())
+      .then(d=>{if(d.ok)toast('저장 완료','ok');else toast('저장 오류: '+(d.error||'unknown'),'err');})
+      .catch(e=>toast('저장 오류: '+e.message,'err'));
+  };
+  // Render 환경: 저장 전 Supabase 최신 데이터 병합
+  if(window.location.protocol!=='file:'&&window.location.hostname!=='localhost'){
+    fetch('/api/data').then(r=>r.json()).then(remote=>{
+      Object.entries(remote||{}).forEach(([wk,val])=>{
+        if(!D[wk]){D[wk]={label:val.label,platforms:val.platforms||{}};}
+        else{
+          // 원격에 있지만 로컬에 없는 플랫폼 보존
+          Object.entries(val.platforms||{}).forEach(([pk,pv])=>{
+            if(pv&&!D[wk].platforms[pk])D[wk].platforms[pk]=pv;
+          });
+        }
+      });
+      doSave();
+    }).catch(()=>doSave());
+  } else {
+    doSave();
+  }
 }
 function importData(input){
   const file=input.files[0];if(!file)return;
