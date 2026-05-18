@@ -299,25 +299,24 @@ const hi=()=>rS&&rE?(rS<=rE?rE:rS):null;
 
 /* ── 스토리지 ── */
 function load(){
-  try{const el=document.getElementById('__DATA__');D=el&&el.textContent.trim()?JSON.parse(el.textContent):{};}catch(e){D={};}
-  if(!D['2026-W19']){
-    D['2026-W19']={label:wkLbl('2026-W19'),platforms:{
-      alwayz:   {adCost:45882,  sales:523910,  roas:1142,clicks:11701,cpc:null,impressions:null,  ctr:null},
-      ssg:      {adCost:350730, sales:3632790, roas:1036,clicks:2081, cpc:169, impressions:231579,ctr:1.13},
-      gs:       {adCost:139760, sales:1378999, roas:987, clicks:null, cpc:null,impressions:null,  ctr:null},
-      kurly:    {adCost:394380, sales:3330400, roas:844, clicks:null, cpc:104, impressions:177749,ctr:2.14},
-      lotte_ai: {adCost:199320, sales:1399000, roas:702, clicks:1507, cpc:132, impressions:136839,ctr:1.10},
-      lotte_cpc:{adCost:10725,  sales:39900,   roas:372, clicks:95,   cpc:113, impressions:3095,  ctr:3.07},
-      toss_ai:null,toss_cpc:null,ohouse:null,ali:null,
-    }};
+  // Render 환경: Supabase에서 불러오기
+  if(window.location.protocol!=='file:'&&window.location.hostname!=='localhost'){
+    fetch('/api/data').then(r=>r.json()).then(data=>{
+      D=data||{};
+      const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
+      if(!curWk||!D[curWk])curWk=wks[wks.length-1];
+      if(!rS&&curWk){const{start,end}=wkDates(curWk);rS=d2s(start);rE=d2s(end);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};}
+      renderDP();renderAll();
+    }).catch(e=>{console.error('Supabase 로드 실패',e);loadFromHTML();});
+    return;
   }
+  loadFromHTML();
+}
+function loadFromHTML(){
+  try{const el=document.getElementById('__DATA__');D=el&&el.textContent.trim()?JSON.parse(el.textContent):{};}catch(e){D={};}
   const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
   if(!curWk||!D[curWk])curWk=wks[wks.length-1];
-  if(!rS){
-    const{start,end}=wkDates(curWk);
-    rS=d2s(start);rE=d2s(end);
-    CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};
-  }
+  if(!rS&&curWk){const{start,end}=wkDates(curWk);rS=d2s(start);rE=d2s(end);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};}
 }
 function save(){
   const body={};
@@ -1110,7 +1109,9 @@ document.addEventListener('mousedown',()=>{if(dpOpen){dpOpen=false;document.getE
 document.addEventListener('mouseup',()=>{if(sel){sel=false;hov=null;renderDP();}});
 
 /* ── 초기화 ── */
-load();renderDP();renderAll();
+load();
+// 로컬 환경에서만 즉시 렌더 (Render는 load() 내부에서 비동기 처리)
+if(window.location.protocol==='file:'||window.location.hostname==='localhost'){renderDP();renderAll();}
 </script>
 </body>
 </html>
