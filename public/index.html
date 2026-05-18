@@ -1017,9 +1017,11 @@ function parseTossReport(rows, hdr){
         ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};
     };
 
-    const inSel=Object.keys(byWeek).includes(wk);
-    if((!p.toss_ai||inSel)  && (ai.adCost||ai.clicks))  p.toss_ai  = mkPlt(ai);
-    if((!p.toss_cpc||inSel) && (cpc.adCost||cpc.clicks)) p.toss_cpc = mkPlt(cpc);
+    // 파일에 있는 주차만 저장. 단 조회 날짜와 일치하면 덮어쓰기 허용
+    const selWks=rS&&rE?rngWks(lo(),hi()):[];
+    const canOverwrite=selWks.includes(wk);
+    if((!p.toss_ai||canOverwrite)  && (ai.adCost||ai.clicks))  p.toss_ai  = mkPlt(ai);
+    if((!p.toss_cpc||canOverwrite) && (cpc.adCost||cpc.clicks)) p.toss_cpc = mkPlt(cpc);
     saved++;
   });
 
@@ -1042,7 +1044,7 @@ function parseOhouseDual(campCSV,dailyCSV){
   const ratio=total>0?oaCost/total:1;
   const bw={};
   parseCSV(dailyCSV).forEach(r=>{const dt=new Date((r['날짜']||'')+'T00:00:00Z');if(isNaN(dt))return;const wk=isoWk(dt);if(!bw[wk])bw[wk]={adCost:0,sales:0,impressions:0,clicks:0};bw[wk].adCost+=pn(r['집행 광고비'])*ratio;bw[wk].sales+=pn(r['광고 전환 매출'])*ratio;bw[wk].impressions+=pn(r['노출수'])*ratio;bw[wk].clicks+=pn(r['클릭수'])*ratio;});
-  let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;const fileWks=Object.keys(bw);const inSel2=fileWks.includes(wk);if(p.ohouse&&p.ohouse.adCost&&!inSel2)return;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);p.ohouse={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
+  let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;const selWksOh=rS&&rE?rngWks(lo(),hi()):[];if(p.ohouse&&p.ohouse.adCost&&!selWksOh.includes(wk))return;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);p.ohouse={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
   const wks=Object.keys(bw).sort();if(!wks.length){toast('오늘의집 날짜 없음','err');return;}
   curWk=wks[wks.length-1];const{start}=wkDates(wks[0]);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};
   toast('오늘의집(오아) '+wks.join(', ')+' 저장 ('+saved+'주차) — 오아비율 '+Math.round(ratio*100)+'%','ok');save();renderDP();renderAll();
@@ -1053,7 +1055,7 @@ function parseOhouseCSV(text){
   const hdr=pr(lines[0]).map(h=>h.trim());const idx={date:hdr.indexOf('날짜'),cost:hdr.indexOf('집행 광고비'),sales:hdr.indexOf('광고 전환 매출'),imp:hdr.indexOf('노출수'),clk:hdr.indexOf('클릭수')};
   if(idx.date<0){toast('오늘의집 형식 오류','err');return;}
   const bw={};for(let i=1;i<lines.length;i++){if(!lines[i].trim())continue;const row=pr(lines[i]);const dt=new Date(row[idx.date]+'T00:00:00Z');if(isNaN(dt))continue;const wk=isoWk(dt);if(!bw[wk])bw[wk]={adCost:0,sales:0,impressions:0,clicks:0};const pn=s=>parseFloat(String(s).replace(/[,%]/g,''))||0;bw[wk].adCost+=pn(row[idx.cost]);bw[wk].sales+=pn(row[idx.sales]);bw[wk].impressions+=pn(row[idx.imp]);bw[wk].clicks+=pn(row[idx.clk]);}
-  const fileWks2=Object.keys(bw);let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;if(p.ohouse&&!fileWks2.includes(wk))return;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);p.ohouse={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
+  let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;const selWksOh2=rS&&rE?rngWks(lo(),hi()):[];if(p.ohouse&&!selWksOh2.includes(wk))return;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);p.ohouse={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
   const wks=Object.keys(bw).sort();if(!wks.length){toast('오늘의집 날짜 없음','err');return;}
   curWk=wks[wks.length-1];const{start}=wkDates(wks[0]);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};
   toast('오늘의집 '+wks.join(', ')+' 저장 ('+saved+'주차)','ok');save();renderDP();renderAll();
@@ -1063,7 +1065,7 @@ function parseAliReport(rows){
   if(idx.date<0){toast('알리 형식 오류','err');return;}
   const pKRW=s=>parseFloat(String(s).replace(/[₩\s,]/g,''))||0;const pN=s=>parseFloat(String(s).replace(/[%,\s]/g,''))||0;
   const bw={};for(let i=1;i<rows.length;i++){const row=rows[i];const ds=String(row[idx.date]||'').trim();if(!ds||ds==='Total')continue;const dt=new Date(ds+'T00:00:00Z');if(isNaN(dt))continue;const wk=isoWk(dt);if(!bw[wk])bw[wk]={adCost:0,sales:0,impressions:0,clicks:0};bw[wk].adCost+=pKRW(row[idx.cost]);bw[wk].sales+=pKRW(row[idx.sales]);bw[wk].impressions+=pN(row[idx.imp]);bw[wk].clicks+=pN(row[idx.clk]);}
-  let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);if(p.ali&&!Object.keys(bw).includes(wk))return;p.ali={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
+  let saved=0;Object.entries(bw).forEach(([wk,o])=>{if(!D[wk])D[wk]={label:wkLbl(wk),platforms:{}};const p=D[wk].platforms;const ac=Math.round(o.adCost),sa=Math.round(o.sales),cl=Math.round(o.clicks),im=Math.round(o.impressions);const selWksAli=rS&&rE?rngWks(lo(),hi()):[];if(p.ali&&!selWksAli.includes(wk))return;p.ali={adCost:ac,sales:sa,roas:ac>0?Math.round(sa/ac*100):0,clicks:cl,impressions:im,cpc:cl>0?Math.round(ac/cl):null,ctr:im>0?parseFloat((cl/im*100).toFixed(2)):null};saved++;});
   const wks=Object.keys(bw).sort();if(!wks.length){toast('알리 날짜 없음','err');return;}
   curWk=wks[wks.length-1];const{start}=wkDates(wks[0]);CL={y:start.getUTCFullYear(),m:start.getUTCMonth()};
   toast('알리 '+wks.join(', ')+' 저장 ('+saved+'주차)','ok');save();renderDP();renderAll();
