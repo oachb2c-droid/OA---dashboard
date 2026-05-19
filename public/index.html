@@ -723,7 +723,8 @@ savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impr
 ━━━ GS 키워드 광고 ━━━
 【8. GS 키워드】 https://partners.gsshop.com → 광고센터 > 키워드 광고 > 키워드 광고 관리
   - 조회기간 ${L}~${H} 설정 후 검색
-  - 노출승인 행 파싱: 광고노출기간, 최종승인키워드, 상품명, 계약금액, ROAS(%), 노출수, 클릭수
+  - 노출승인 상태 행의 '상세리포트 보기' 클릭 → 각 키워드별 ROAS, 노출수, 클릭수, 전환매출 확인
+  - 파싱 항목: 광고노출기간, 최종승인키워드, 상품명, 계약금액, ROAS(%), 노출수, 클릭수
   - 전환매출 = 계약금액 × ROAS ÷ 100
   - 수집 후 대시보드 탭 콘솔에서:
 saveGsKeywords("${weekKey}", [
@@ -902,27 +903,27 @@ function renderGsKeywords(wks){
     <div style="background:var(--card);border:.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg)">
-          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">광고노출기간</th>
-          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">키워드</th>
-          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">상품명</th>
-          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">계약금액(광고비)</th>
-          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">ROAS</th>
-          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">전환매출</th>
-          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">노출수</th>
-          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">클릭수</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">광고노출기간</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">키워드</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">상품명</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">계약금액(광고비)</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">ROAS</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">전환매출</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">노출수</th>
+          <th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">클릭수</th>
         </tr></thead>
         <tbody>
           ${allKws.map(k=>{
             const sales=k.sales!=null?k.sales:(k.amount&&k.roas?Math.round(k.amount*k.roas/100):null);
             return`<tr style="border-bottom:.5px solid var(--border)">
-            <td style="padding:7px 10px;color:var(--text2);font-size:11px">${k.period||'-'}</td>
-            <td style="padding:7px 10px;color:var(--text1);font-size:12px">${k.keyword||'-'}</td>
-            <td style="padding:7px 10px;color:var(--text2);font-size:11px">${k.product||'-'}</td>
-            <td style="padding:7px 10px;text-align:right;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
-            <td style="padding:7px 10px;text-align:right;color:${(k.roas||0)>=800?'#16a34a':(k.roas||0)>=500?'#d97706':'#dc2626'}">${k.roas!=null?k.roas+'%':'-'}</td>
-            <td style="padding:7px 10px;text-align:right;color:var(--text1)">${sales!=null?'₩'+Math.round(sales/10000)+'만':'-'}</td>
-            <td style="padding:7px 10px;text-align:right;color:var(--text2)">${k.impressions!=null?k.impressions.toLocaleString():'-'}</td>
-            <td style="padding:7px 10px;text-align:right;color:var(--text2)">${k.clicks!=null?k.clicks.toLocaleString():'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text2);font-size:11px">${k.period||'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text1);font-size:12px">${k.keyword||'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text2);font-size:11px">${k.product||'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
+            <td style="padding:7px 10px;text-align:center;color:${(k.roas||0)>=800?'#16a34a':(k.roas||0)>=500?'#d97706':'#dc2626'}">${k.roas!=null?k.roas+'%':'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text1)">${sales!=null?'₩'+Math.round(sales/10000)+'만':'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text2)">${k.impressions!=null?k.impressions.toLocaleString():'-'}</td>
+            <td style="padding:7px 10px;text-align:center;color:var(--text2)">${k.clicks!=null?k.clicks.toLocaleString():'-'}</td>
           </tr>`;}).join('')}
         </tbody>
         <tfoot><tr style="background:var(--bg)">
