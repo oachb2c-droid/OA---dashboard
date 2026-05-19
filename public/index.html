@@ -75,7 +75,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cdone{color:var(--green-t)} .cerr{color:var(--red-t)} .crun{color:var(--amber-t)}
 
 /* 요약카드 */
-.sg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.sg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-bottom:14px}
+@media(max-width:1024px){.sg{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:680px){.sg{grid-template-columns:repeat(2,1fr)}}
 .mc{background:var(--bg);border:.5px solid var(--border);border-radius:var(--r);padding:10px 12px}
 .ml{font-size:10px;color:var(--text2);margin-bottom:3px}
@@ -205,6 +206,7 @@ tfoot td:first-child{text-align:left}
     </table>
   </div></div>
 
+  <div id="gsKwSection" style="display:none"></div>
   <div class="cr">
     <div class="cc"><div class="cl2">광고비 vs 전환매출 (만원)</div><div style="position:relative;height:155px"><canvas id="ch1"></canvas></div></div>
     <div class="cc"><div class="cl2">주차별 ROAS 추이 (%)</div><div style="position:relative;height:155px"><canvas id="ch2"></canvas></div></div>
@@ -250,6 +252,7 @@ const PLATFORMS=[
   {key:'toss_cpc',  name:'토스 CPC',      type:'toss'},
   {key:'ohouse',    name:'오늘의집 CPC',  type:'excel'},
   {key:'ali',       name:'알리 CPC',      type:'excel'},
+  {key:'ezwel',     name:'이지웰',         type:'auto'},
 ];
 
 const SK='oa_ad_weekly_data_v2';
@@ -701,7 +704,7 @@ function buildCollectPrompt(L,H){
   const jan1=new Date(d.getFullYear(),0,1);
   const wk=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
   const weekKey=d.getFullYear()+'-W'+String(wk).padStart(2,'0');
-  return `광고 플랫폼 6개에서 기간 ${L} ~ ${H} 데이터를 수집하고 대시보드에 직접 저장해줘.
+  return `광고 플랫폼 데이터를 수집하고 대시보드에 직접 저장해줘.
 
 각 플랫폼 수집 후 대시보드 탭(https://oa-dashboard-8bwy.onrender.com/)으로 이동해서 F12 콘솔에서 실행:
 savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impressions:숫자, clicks:숫자, cpc:숫자, ctr:숫자});
@@ -713,8 +716,19 @@ savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impr
 【4. 컬리 AI】 https://ad.kurly.com → "kurly"
 【5. 롯데ON AI】 https://ad.lotteon.com/advRpt/advSadRptDay → "lotte_ai"
 【6. 롯데ON CPC】 https://ad.lotteon.com/advRpt/advClickRptDay → "lotte_cpc"
+【7. 이지웰】 https://admarket.ezwel.com/console/report/searchAdByCpList → "ezwel"
 
-6개 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
+━━━ GS 키워드 광고 별도 수집 ━━━
+【8. GS 키워드】 https://partners.gsshop.com → 광고센터 > 키워드 광고 > 키워드 광고 관리
+- 조회기간 ${L}~${H} 설정 후 검색
+- 노출승인 상태 행만 파싱: 광고노출기간, 최종승인키워드, 상품명, 계약금액(숫자)
+- 수집 후 대시보드 탭 콘솔에서 실행:
+saveGsKeywords("${weekKey}", [
+  {period:"노출기간예시", keyword:"키워드명", product:"상품명", amount:금액숫자},
+  ...
+]);
+
+8개 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
 }
 
 function openCollectModal(){
@@ -722,76 +736,186 @@ function openCollectModal(){
   const L=lo(),H=hi();
   const wks=rngWks(L,H);
   const platforms=[
-    {key:'alwayz',name:'올웨이즈 CPS'},
-    {key:'ssg',name:'SSG AI'},
-    {key:'gs',name:'GS홈쇼핑 AI'},
-    {key:'kurly',name:'컬리 AI'},
-    {key:'lotte_ai',name:'롯데ON AI'},
-    {key:'lotte_cpc',name:'롯데ON CPC'},
+    {key:'alwayz',name:'올웨이즈 CPS', url:'https://www.alwayzadcenter.com/report'},
+    {key:'ssg',   name:'SSG AI',       url:'https://ad.ssg.com'},
+    {key:'gs',    name:'GS홈쇼핑 AI',  url:'https://seller.gsshop.com'},
+    {key:'kurly', name:'컬리 AI',       url:'https://ad.kurly.com'},
+    {key:'lotte_ai', name:'롯데ON AI',  url:'https://ad.lotteon.com/advRpt/advSadRptDay'},
+    {key:'lotte_cpc',name:'롯데ON CPC', url:'https://ad.lotteon.com/advRpt/advClickRptDay'},
+    {key:'ezwel', name:'이지웰',        url:'https://admarket.ezwel.com/console/report/searchAdByCpList'},
+    {key:'gs_kw', name:'GS 키워드',     url:'https://partners.gsshop.com'},
   ];
-  const statusHtml=platforms.map(pl=>{
-    const hasDat=wks.some(wk=>D[wk]?.platforms?.[pl.key]);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid #e5e7eb">
-      <span>${hasDat?'✅':'⬜'}</span>
-      <span style="font-size:12px;color:#111827">${pl.name}</span>
-      <span style="font-size:11px;color:${hasDat?'#16a34a':'#dc2626'};margin-left:auto">${hasDat?'수집됨':'미수집'}</span>
-    </div>`;
-  }).join('');
-  const prompt=buildCollectPrompt(L,H);
+
   const existing=document.getElementById('collectModal');
   if(existing)existing.remove();
   const modal=document.createElement('div');
   modal.id='collectModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML=`
-    <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow:auto;padding:20px 22px;box-shadow:0 8px 32px rgba(0,0,0,.35)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:14px;font-weight:700;color:#111827">🤖 자동수집 — Claude MCP</div>
-        <button onclick="document.getElementById('collectModal').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#6b7280">✕</button>
-      </div>
-      <div style="font-size:11px;color:#6b7280;margin-bottom:10px">기간: <b style="color:#111827">${L} ~ ${H}</b> (${wks.length}주차)</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">수집 현황</div>
-      <div style="margin-bottom:14px">${statusHtml}</div>
-      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">① 프롬프트 복사 → Claude MCP에 붙여넣기</div>
-      <div style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:10px;font-size:10px;color:#374151;white-space:pre-wrap;max-height:140px;overflow:auto;margin-bottom:8px;line-height:1.5">${prompt.replace(/</g,'&lt;')}</div>
-      <button id="copyPromptBtn" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:14px">📋 프롬프트 복사</button>
-      <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">② 수집 로그</div>
-      <div id="clog" style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:8px;max-height:120px;overflow-y:auto;min-height:40px;font-size:11px">
-        <div style="color:#9ca3af">Claude MCP 수집 완료 후 자동으로 로그가 표시됩니다.</div>
-      </div>
-    </div>`;
-  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
-  document.body.appendChild(modal);
-  logs=[];
-  const copyBtn=document.getElementById('copyPromptBtn');
-  if(copyBtn){
-    copyBtn.addEventListener('click',()=>{
-      navigator.clipboard.writeText(prompt).then(()=>{
-        copyBtn.textContent='✅ 복사됨!';
-        setTimeout(()=>{copyBtn.textContent='📋 프롬프트 복사';},1500);
+
+  // 체크 상태 (기본: 미수집 항목만 체크)
+  const checked={};
+  platforms.forEach(pl=>{
+    const hasDat=pl.key==='gs_kw'
+      ? wks.some(wk=>D[wk]?.gsKeywords?.length>0)
+      : wks.some(wk=>D[wk]?.platforms?.[pl.key]);
+    checked[pl.key]=!hasDat;
+  });
+
+  function buildPrompt(sel){
+    const d=new Date(L);
+    const jan1=new Date(d.getFullYear(),0,1);
+    const wk=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+    const weekKey=d.getFullYear()+'-W'+String(wk).padStart(2,'0');
+    const items=platforms.filter(p=>sel[p.key]);
+    if(!items.length)return '수집할 플랫폼을 선택해주세요.';
+
+    const platformMap={
+      alwayz:'"alwayz"',ssg:'"ssg"',gs:'"gs"',kurly:'"kurly"',
+      lotte_ai:'"lotte_ai"',lotte_cpc:'"lotte_cpc"',ezwel:'"ezwel"'
+    };
+    const normalItems=items.filter(p=>p.key!=='gs_kw');
+    const hasGsKw=sel['gs_kw'];
+
+    let prompt=`광고 플랫폼 데이터를 수집하고 대시보드에 직접 저장해줘.
+
+각 플랫폼 수집 후 대시보드 탭(https://oa-dashboard-8bwy.onrender.com/)으로 이동해서 F12 콘솔에서 실행:
+savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impressions:숫자, clicks:숫자, cpc:숫자, ctr:숫자});
+금액: 원 단위 숫자만(콤마없이) / ctr: % 숫자만(예:1.23) / 없는 항목은 0
+`;
+
+    normalItems.forEach((p,i)=>{
+      prompt+=`
+【${i+1}. ${p.name}】 ${p.url} → ${platformMap[p.key]}`;
+    });
+
+    if(hasGsKw){
+      prompt+=`
+
+━━━ GS 키워드 광고 ━━━
+【${normalItems.length+1}. GS 키워드】 https://partners.gsshop.com → 광고센터 > 키워드 광고 > 키워드 광고 관리
+- 조회기간 ${L}~${H} 설정 후 검색
+- 노출승인 행: 광고노출기간, 최종승인키워드, 상품명, 계약금액 파싱
+- 대시보드 탭 콘솔에서:
+saveGsKeywords("${weekKey}", [{period:"노출기간", keyword:"키워드", product:"상품명", amount:금액숫자}, ...]);`;
+    }
+
+    prompt+=`
+
+모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
+    return prompt;
+  }
+
+  function renderModal(){
+    const statusHtml=platforms.map(pl=>{
+      const hasDat=pl.key==='gs_kw'
+        ? wks.some(wk=>D[wk]?.gsKeywords?.length>0)
+        : wks.some(wk=>D[wk]?.platforms?.[pl.key]);
+      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid #e5e7eb;cursor:pointer">
+        <input type="checkbox" data-key="${pl.key}" ${checked[pl.key]?'checked':''} style="width:15px;height:15px;cursor:pointer">
+        <span style="font-size:12px;color:#111827;flex:1">${pl.name}</span>
+        <span style="font-size:11px;color:${hasDat?'#16a34a':'#dc2626'}">${hasDat?'수집됨':'미수집'}</span>
+      </label>`;
+    }).join('');
+
+    const prompt=buildPrompt(checked);
+    modal.innerHTML=`
+      <div style="background:#fff;border-radius:12px;width:500px;max-width:95vw;max-height:90vh;overflow:auto;padding:20px 22px;box-shadow:0 8px 32px rgba(0,0,0,.35)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-size:14px;font-weight:700;color:#111827">🤖 자동수집 — Claude MCP</div>
+          <button onclick="document.getElementById('collectModal').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#6b7280">✕</button>
+        </div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:10px">기간: <b style="color:#111827">${L} ~ ${H}</b> (${wks.length}주차)</div>
+        <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:4px">수집 현황 <span style="font-size:10px;font-weight:400;color:#6b7280">— 체크한 항목만 프롬프트에 포함</span></div>
+        <div id="platformChecks" style="margin-bottom:14px">${statusHtml}</div>
+        <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">① 프롬프트 복사 → Claude MCP에 붙여넣기</div>
+        <div id="promptPreview" style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:10px;font-size:10px;color:#374151;white-space:pre-wrap;max-height:150px;overflow:auto;margin-bottom:8px;line-height:1.5">${prompt.replace(/</g,'&lt;')}</div>
+        <button id="copyPromptBtn" style="width:100%;padding:8px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:14px">📋 프롬프트 복사</button>
+        <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:6px">② 수집 로그</div>
+        <div id="clog" style="background:#f9fafb;border:.5px solid #e5e7eb;border-radius:6px;padding:8px;max-height:100px;overflow-y:auto;min-height:36px;font-size:11px">
+          <div style="color:#9ca3af">Claude MCP 수집 완료 후 자동으로 로그가 표시됩니다.</div>
+        </div>
+      </div>`;
+
+    modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+    document.body.appendChild(modal);
+    logs=[];
+
+    // 체크박스 변경 시 프롬프트 실시간 업데이트
+    modal.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change',()=>{
+        checked[cb.dataset.key]=cb.checked;
+        const newPrompt=buildPrompt(checked);
+        document.getElementById('promptPreview').textContent=newPrompt;
+      });
+    });
+
+    // 복사 버튼
+    document.getElementById('copyPromptBtn').addEventListener('click',function(){
+      const txt=buildPrompt(checked);
+      navigator.clipboard.writeText(txt).then(()=>{
+        this.textContent='✅ 복사됨!';
+        setTimeout(()=>{this.textContent='📋 프롬프트 복사';},1500);
       }).catch(()=>{
         const ta=document.createElement('textarea');
-        ta.value=prompt;ta.style.cssText='position:fixed;opacity:0';
+        ta.value=txt;ta.style.cssText='position:fixed;opacity:0';
         document.body.appendChild(ta);ta.select();document.execCommand('copy');
         document.body.removeChild(ta);
-        copyBtn.textContent='✅ 복사됨!';
-        setTimeout(()=>{copyBtn.textContent='📋 프롬프트 복사';},1500);
+        this.textContent='✅ 복사됨!';
+        setTimeout(()=>{this.textContent='📋 프롬프트 복사';},1500);
       });
     });
   }
-}
 
-function savePlatformData(weekKey,platformKey,data){
-  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
-  D[weekKey].platforms[platformKey]=data;
-  save();renderAll();
-  addLog(`${weekKey} ${platformKey} 저장 완료`,'done');
-  toast(`${platformKey} 저장 완료`,'ok');
+  renderModal();
 }
-window.savePlatformData=savePlatformData;
 
 async function startCollect(){
   openCollectModal();
+}
+
+function saveGsKeywords(weekKey, keywords){
+  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
+  D[weekKey].gsKeywords=keywords||[];
+  save();renderAll();
+  toast('GS 키워드 '+keywords.length+'개 저장 완료','ok');
+}
+window.saveGsKeywords=saveGsKeywords;
+
+function renderGsKeywords(wks){
+  const el=document.getElementById('gsKwSection');
+  if(!el)return;
+  const allKws=[];
+  (wks||[]).forEach(wk=>{(D[wk]?.gsKeywords||[]).forEach(k=>allKws.push({...k,wk}));});
+  if(!allKws.length){el.style.display='none';return;}
+  el.style.display='block';
+  const total=allKws.reduce((s,k)=>s+(k.amount||0),0);
+  el.innerHTML=`
+    <div style="margin:14px 0 8px;font-size:13px;font-weight:500;color:var(--text1);display:flex;align-items:center;gap:6px">
+      <span>🏷️</span> GS홈쇼핑 키워드 광고
+      <span style="font-size:11px;color:var(--text2);font-weight:400">(${wks.map(w=>wkLbl(w)).join(', ')})</span>
+    </div>
+    <div style="background:var(--card);border:.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">광고노출기간</th>
+          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">키워드</th>
+          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">상품명</th>
+          <th style="padding:8px 12px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">계약금액</th>
+        </tr></thead>
+        <tbody>
+          ${allKws.map(k=>`<tr style="border-bottom:.5px solid var(--border)">
+            <td style="padding:7px 12px;color:var(--text2);font-size:11px">${k.period||'-'}</td>
+            <td style="padding:7px 12px;color:var(--text1)">${k.keyword||'-'}</td>
+            <td style="padding:7px 12px;color:var(--text2)">${k.product||'-'}</td>
+            <td style="padding:7px 12px;text-align:right;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:var(--bg)">
+          <td colspan="3" style="padding:8px 12px;font-weight:500;color:var(--text1)">합계 (${allKws.length}개)</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:500;color:var(--text1)">₩${total.toLocaleString()}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
 }
 
 function saveLotteon(weekKey,ai,cpc){
@@ -804,6 +928,17 @@ function saveLotteon(weekKey,ai,cpc){
 window.saveLotteon=saveLotteon;
 
 /* ── 메인 렌더 ── */
+
+let _sortField=null, _sortDir=1;
+function sortTable(field){
+  if(_sortField===field){_sortDir*=-1;}else{_sortField=field;_sortDir=-1;}
+  // 정렬 아이콘 업데이트
+  ['adCost','roas','sales','impressions','clicks','cpc','ctr'].forEach(f=>{
+    const el=document.getElementById('sort_'+f);
+    if(el)el.textContent=f===field?(_sortDir===-1?'▼':'▲'):'⇅';
+  });
+  renderAll();
+}
 function renderAll(){
   const sWks=rS&&rE?rngWks(lo(),hi()):[curWk];
   const tot=totRng(sWks);
@@ -852,13 +987,24 @@ function renderAll(){
   // 테이블 헤더
   document.getElementById('th').innerHTML=`<tr>
     <th style="text-align:left">플랫폼</th>
-    <th>광고비</th><th class="pv">전기간</th>
-    <th>ROAS</th><th class="pv">전기간</th>
-    <th>전환매출</th><th>노출수</th><th>클릭수</th>
-    <th>평균CPC</th><th>평균CTR</th><th>수집</th>
+    <th onclick="sortTable('adCost')" style="cursor:pointer">광고비 <span id="sort_adCost">⇅</span></th><th class="pv">전기간</th>
+    <th onclick="sortTable('roas')" style="cursor:pointer">ROAS <span id="sort_roas">⇅</span></th><th class="pv">전기간</th>
+    <th onclick="sortTable('sales')" style="cursor:pointer">전환매출 <span id="sort_sales">⇅</span></th>
+    <th onclick="sortTable('impressions')" style="cursor:pointer">노출수 <span id="sort_impressions">⇅</span></th>
+    <th onclick="sortTable('clicks')" style="cursor:pointer">클릭수 <span id="sort_clicks">⇅</span></th>
+    <th onclick="sortTable('cpc')" style="cursor:pointer">평균CPC <span id="sort_cpc">⇅</span></th>
+    <th onclick="sortTable('ctr')" style="cursor:pointer">평균CTR <span id="sort_ctr">⇅</span></th>
+    <th>수집</th>
   </tr>`;
 
-  document.getElementById('tb').innerHTML=PLATFORMS.map(p=>{
+  const _sorted=[...PLATFORMS].sort((a,b)=>{
+    if(!_sortField)return 0;
+    const wks=rngWks(lo(),hi());
+    const av=pTot(a.key,wks), bv=pTot(b.key,wks);
+    const ag=av?av[_sortField]??0:0, bg=bv?bv[_sortField]??0:0;
+    return (ag-bg)*_sortDir;
+  });
+  document.getElementById('tb').innerHTML=_sorted.map(p=>{
     const pd=pTot(p.key,sWks);
     const ppd=prevPlt[p.key];
     const [bc,bl]=p.type==='lotteon'?['blo2','자동(롯데)']:p.type==='toss'?['bto','엑셀업로드']:p.type==='excel'?['boh','엑셀업로드']:p.type==='auto'?['bau','자동']:['bna','대기'];
@@ -878,17 +1024,7 @@ function renderAll(){
     </tr>`;
   }).join('');
 
-  document.getElementById('tf').innerHTML=`<tr>
-    <td>합계</td>
-    <td>${fw(tot.adCost)}</td><td class="pv" style="font-weight:400">${pTotAll?fw(pTotAll.adCost):'-'}</td>
-    <td><strong>${tot.roas}%</strong></td><td class="pv" style="font-weight:400">${pTotAll?pTotAll.roas+'%':'-'}</td>
-    <td>${fw(tot.sales)}</td>
-    <td>${tot.impressions?fw(tot.impressions):'-'}</td>
-    <td>${tot.clicks?fw(tot.clicks):'-'}</td>
-    <td>${tot.cpc?'₩'+fw(tot.cpc):'-'}</td>
-    <td>${tot.ctr!=null?tot.ctr.toFixed(2)+'%':'-'}</td>
-    <td></td>
-  </tr>`;
+  document.getElementById('tf').innerHTML=`<tr><td>합계</td><td>${fw(tot.adCost)}</td><td class="pv" style="font-weight:400">${pTotAll?fw(pTotAll.adCost):'-'}</td><td><strong>${tot.roas}%</strong></td><td class="pv" style="font-weight:400">${pTotAll?pTotAll.roas+'%':'-'}</td><td>${fw(tot.sales)}</td><td>${tot.impressions?fw(tot.impressions):'-'}</td><td>${tot.clicks?fw(tot.clicks):'-'}</td><td>${tot.cpc?'₩'+fw(tot.cpc):'-'}</td><td>${tot.ctr!=null?tot.ctr.toFixed(2)+'%':'-'}</td><td></td></tr>`;
 
   drawCharts(sWks);
   renderInsightBar(sWks);
@@ -916,6 +1052,7 @@ function drawCharts(sWks){
       pointRadius:wks.map(w=>sWks.includes(w)?5:3),tension:0.3,fill:true}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
     scales:{x:{ticks:{font:{size:9},autoSkip:true,maxRotation:0},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}}}}});}
+  renderGsKeywords(sWks);
 }
 
 /* ── 직접입력 모달 ── */
