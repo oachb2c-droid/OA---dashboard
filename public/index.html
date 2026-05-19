@@ -357,6 +357,8 @@ function save(){
           Object.entries(val.platforms||{}).forEach(([pk,pv])=>{
             if(pv&&!D[wk].platforms[pk])D[wk].platforms[pk]=pv;
           });
+          // gsKeywords 보존 (로컬에 없으면 원격 값 사용)
+          if(val.gsKeywords?.length&&!D[wk].gsKeywords?.length)D[wk].gsKeywords=val.gsKeywords;
         }
       });
       doSave();
@@ -999,7 +1001,7 @@ function renderAll(){
     ['총 클릭수',   tot.clicks?fw(tot.clicks):'-',          tot.clicks,     pTotAll?.clicks,     true,  pTotAll&&pTotAll.clicks?`전기간 ${fw(pTotAll.clicks)}`:''],
     ['평균 CPC',    tot.cpc?`₩${fw(tot.cpc)}`:'-',         tot.cpc,        pTotAll?.cpc,        false, pTotAll&&pTotAll.cpc?`전기간 ₩${fw(pTotAll.cpc)}`:''],
     ['평균 CTR',    tot.ctr!=null?tot.ctr.toFixed(2)+'%':'-',tot.ctr,      pTotAll?.ctr,        true,  pTotAll&&pTotAll.ctr!=null?`전기간 ${pTotAll.ctr.toFixed(2)}%`:''],
-    ['수집 플랫폼', `${tot.cnt} / 10`,                       null,           null,                true,  sWks.length+'개 주차'],
+    ['수집 플랫폼', `${tot.cnt} / 11`,                       null,           null,                true,  sWks.length+'개 주차'],
   ];
   document.getElementById('sg').innerHTML=cards.map(([l,v,cv,pv,good,sub])=>`
     <div class="mc">
