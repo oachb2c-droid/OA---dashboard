@@ -347,19 +347,19 @@ function save(){
       .then(d=>{if(d.ok)toast('저장 완료','ok');else toast('저장 오류: '+(d.error||'unknown'),'err');})
       .catch(e=>toast('저장 오류: '+e.message,'err'));
   };
-  // Render 환경: 저장 전 Supabase 최신 데이터 병합
+  // Render 환경: 저장 전 Supabase의 gsKeywords만 보존
   if(window.location.protocol!=='file:'&&window.location.hostname!=='localhost'){
     fetch('/api/data').then(r=>r.json()).then(remote=>{
       Object.entries(remote||{}).forEach(([wk,val])=>{
-        if(!D[wk]){D[wk]={label:val.label,platforms:val.platforms||{}};}
-        else{
-          // 원격에 있지만 로컬에 없는 플랫폼 보존
-          Object.entries(val.platforms||{}).forEach(([pk,pv])=>{
-            if(pv&&!D[wk].platforms[pk])D[wk].platforms[pk]=pv;
-          });
-          // gsKeywords 보존 (로컬에 없으면 원격 값 사용)
-          if(val.gsKeywords?.length&&!D[wk].gsKeywords?.length)D[wk].gsKeywords=val.gsKeywords;
+        if(!D[wk])return;
+        // 로컬에 gsKeywords 없으면 원격 값으로 채움
+        if(!D[wk].gsKeywords?.length && val.gsKeywords?.length){
+          D[wk].gsKeywords=val.gsKeywords;
         }
+        // 로컬에 없는 플랫폼도 원격에서 보존
+        Object.entries(val.platforms||{}).forEach(([pk,pv])=>{
+          if(pv&&!D[wk].platforms[pk])D[wk].platforms[pk]=pv;
+        });
       });
       doSave();
     }).catch(()=>doSave());
