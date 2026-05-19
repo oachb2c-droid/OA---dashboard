@@ -148,7 +148,13 @@ tfoot td:first-child{text-align:left}
       <button class="btn" style="background:var(--bg2);color:var(--text2);border-color:var(--border2)" onclick="document.getElementById('jsonIn').click()"><i class="ti ti-database-import"></i>불러오기</button>
       <button class="btn btn-in" onclick="openModal()"><i class="ti ti-pencil"></i>직접 입력</button>
       <button class="btn btn-co" id="coBtn" onclick="startCollect()"><i class="ti ti-refresh"></i>자동 수집 ↗</button>
-      <button class="btn" style="background:#F5F3FF;color:#7C3AED;border-color:#7C3AED" onclick="openAiPanel(event)">✦ AI 인사이트</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#7C3AED;border:.5px solid #7C3AED;border-radius:6px;padding:4px 8px;background:#F5F3FF">
+          <input type="checkbox" id="useClaudeAI" onchange="toggleClaudeAI(this.checked)" style="cursor:pointer;accent-color:#7C3AED">
+          Claude AI 사용
+        </label>
+        <button class="btn" style="background:#F5F3FF;color:#7C3AED;border-color:#7C3AED" onclick="openAiPanel(event)">✦ AI 인사이트</button>
+      </div>
     </div>
   </div>
 
@@ -487,6 +493,23 @@ function openAiPanel(e){
   document.getElementById('aiBody').innerHTML='<div style="display:flex;align-items:center;gap:6px;color:var(--text2)"><span>●</span><span>Claude가 분석 중...</span></div>';
   fetchAiInsight();
 }
+function toggleClaudeAI(checked){
+  localStorage.setItem('oa_use_claude_ai', checked?'1':'0');
+  const btn=document.getElementById('useClaudeAI');
+  if(btn)btn.checked=checked;
+}
+
+// 초기화 시 체크박스 상태 복원
+(function(){
+  const saved=localStorage.getItem('oa_use_claude_ai');
+  // 기본값: 사용 안 함
+  const use=saved==='1';
+  document.addEventListener('DOMContentLoaded',()=>{
+    const cb=document.getElementById('useClaudeAI');
+    if(cb)cb.checked=use;
+  });
+})();
+
 async function fetchAiInsight(){
   const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
   const recent=(rS&&rE)?rngWks(lo(),hi()):wks.slice(-3);
@@ -501,6 +524,15 @@ async function fetchAiInsight(){
 
   const prompt='당신은 이커머스 광고 전문 컨설턴트입니다. 아래는 오아 주식회사의 최근 광고 플랫폼별 주차 성과 데이터입니다.\n\n'+summary+'\n\n위 데이터를 분석하여 다음 형식으로 답변해주세요.\n주의: 날짜는 반드시 05.11~05.17 형식으로, 전문용어 없이 쉽게, 금액은 185,000원 형식으로.\n\n**✅ 성과 우수 플랫폼 (2개)**\n- [플랫폼명]: ROAS [수치]% — [쉬운 설명 1줄]\n- [플랫폼명]: ROAS [수치]% — [쉬운 설명 1줄]\n\n**⚠️ 개선 필요 플랫폼 (2개)**\n- [플랫폼명]: ROAS [수치]% — [문제점과 해결방법 1줄]\n- [플랫폼명]: ROAS [수치]% — [문제점과 해결방법 1줄]\n\n**🎯 다음 주 할 일 (1가지)**\n[구체적 액션 2줄 이내]';
 
+  // Claude AI 사용 여부 체크
+  const useClaudeAI=document.getElementById('useClaudeAI')?.checked||localStorage.getItem('oa_use_claude_ai')==='1';
+  if(!useClaudeAI){
+    const wks=(rS&&rE)?rngWks(lo(),hi()):Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort().slice(-3);
+    document.getElementById('aiBody').innerHTML='<div style="color:var(--text2);font-size:11px">💡 Claude AI 미사용 — 데이터 기반 인사이트를 표시합니다.</div>';
+    renderInsightBar(wks);
+    setTimeout(()=>document.getElementById('insightBar')?.scrollIntoView({behavior:'smooth',block:'center'}),300);
+    return;
+  }
   const apiKey=window.__CLAUDE_KEY__||'';
 
   // API 키 없으면 바로 로컬 분석
