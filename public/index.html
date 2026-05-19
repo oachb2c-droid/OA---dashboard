@@ -716,19 +716,22 @@ savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impr
 【4. 컬리 AI】 https://ad.kurly.com → "kurly"
 【5. 롯데ON AI】 https://ad.lotteon.com/advRpt/advSadRptDay → "lotte_ai"
 【6. 롯데ON CPC】 https://ad.lotteon.com/advRpt/advClickRptDay → "lotte_cpc"
-【7. 이지웰】 https://admarket.ezwel.com/console/report/searchAdByCpList → "ezwel"
+【7. 이지웰】 https://admarket.ezwel.com/console/report/adReport → "ezwel"
+  - 광고리포트 > 광고주 종합 리포트 > 검색광고 체크 > 날짜 조회
+  - 이지웰 전환매출 계산: sales = Math.round(adCost * roas / 100)
 
-━━━ GS 키워드 광고 별도 수집 ━━━
+━━━ GS 키워드 광고 ━━━
 【8. GS 키워드】 https://partners.gsshop.com → 광고센터 > 키워드 광고 > 키워드 광고 관리
-- 조회기간 ${L}~${H} 설정 후 검색
-- 노출승인 상태 행만 파싱: 광고노출기간, 최종승인키워드, 상품명, 계약금액(숫자)
-- 수집 후 대시보드 탭 콘솔에서 실행:
+  - 조회기간 ${L}~${H} 설정 후 검색
+  - 노출승인 행 파싱: 광고노출기간, 최종승인키워드, 상품명, 계약금액, ROAS(%), 노출수, 클릭수
+  - 전환매출 = 계약금액 × ROAS ÷ 100
+  - 수집 후 대시보드 탭 콘솔에서:
 saveGsKeywords("${weekKey}", [
-  {period:"노출기간예시", keyword:"키워드명", product:"상품명", amount:금액숫자},
+  {period:"광고노출기간", keyword:"키워드명", product:"상품명", amount:금액숫자, roas:ROAS숫자, sales:전환매출숫자, impressions:노출수숫자, clicks:클릭수숫자},
   ...
 ]);
 
-8개 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
+모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
 }
 
 function openCollectModal(){
@@ -742,7 +745,7 @@ function openCollectModal(){
     {key:'kurly', name:'컬리 AI',       url:'https://ad.kurly.com'},
     {key:'lotte_ai', name:'롯데ON AI',  url:'https://ad.lotteon.com/advRpt/advSadRptDay'},
     {key:'lotte_cpc',name:'롯데ON CPC', url:'https://ad.lotteon.com/advRpt/advClickRptDay'},
-    {key:'ezwel', name:'이지웰',        url:'https://admarket.ezwel.com/console/report/searchAdByCpList'},
+    {key:'ezwel', name:'이지웰',        url:'https://admarket.ezwel.com/console/report/adReport'},
     {key:'gs_kw', name:'GS 키워드',     url:'https://partners.gsshop.com'},
   ];
 
@@ -800,6 +803,8 @@ saveGsKeywords("${weekKey}", [{period:"노출기간", keyword:"키워드", produ
     }
 
     prompt+=`
+
+이지웰 ROAS→전환매출 계산: sales = Math.round(adCost * roas / 100)
 
 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
     return prompt;
@@ -897,22 +902,33 @@ function renderGsKeywords(wks){
     <div style="background:var(--card);border:.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg)">
-          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">광고노출기간</th>
-          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">키워드</th>
-          <th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">상품명</th>
-          <th style="padding:8px 12px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">계약금액</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">광고노출기간</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">키워드</th>
+          <th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">상품명</th>
+          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">계약금액(광고비)</th>
+          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">ROAS</th>
+          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">전환매출</th>
+          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">노출수</th>
+          <th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border);font-size:11px">클릭수</th>
         </tr></thead>
         <tbody>
-          ${allKws.map(k=>`<tr style="border-bottom:.5px solid var(--border)">
-            <td style="padding:7px 12px;color:var(--text2);font-size:11px">${k.period||'-'}</td>
-            <td style="padding:7px 12px;color:var(--text1)">${k.keyword||'-'}</td>
-            <td style="padding:7px 12px;color:var(--text2)">${k.product||'-'}</td>
-            <td style="padding:7px 12px;text-align:right;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
-          </tr>`).join('')}
+          ${allKws.map(k=>{
+            const sales=k.sales!=null?k.sales:(k.amount&&k.roas?Math.round(k.amount*k.roas/100):null);
+            return`<tr style="border-bottom:.5px solid var(--border)">
+            <td style="padding:7px 10px;color:var(--text2);font-size:11px">${k.period||'-'}</td>
+            <td style="padding:7px 10px;color:var(--text1);font-size:12px">${k.keyword||'-'}</td>
+            <td style="padding:7px 10px;color:var(--text2);font-size:11px">${k.product||'-'}</td>
+            <td style="padding:7px 10px;text-align:right;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
+            <td style="padding:7px 10px;text-align:right;color:${(k.roas||0)>=800?'#16a34a':(k.roas||0)>=500?'#d97706':'#dc2626'}">${k.roas!=null?k.roas+'%':'-'}</td>
+            <td style="padding:7px 10px;text-align:right;color:var(--text1)">${sales!=null?'₩'+Math.round(sales/10000)+'만':'-'}</td>
+            <td style="padding:7px 10px;text-align:right;color:var(--text2)">${k.impressions!=null?k.impressions.toLocaleString():'-'}</td>
+            <td style="padding:7px 10px;text-align:right;color:var(--text2)">${k.clicks!=null?k.clicks.toLocaleString():'-'}</td>
+          </tr>`;}).join('')}
         </tbody>
         <tfoot><tr style="background:var(--bg)">
-          <td colspan="3" style="padding:8px 12px;font-weight:500;color:var(--text1)">합계 (${allKws.length}개)</td>
-          <td style="padding:8px 12px;text-align:right;font-weight:500;color:var(--text1)">₩${total.toLocaleString()}</td>
+          <td colspan="3" style="padding:8px 10px;font-weight:500;color:var(--text1);font-size:12px">합계 (${allKws.length}개)</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:500;color:var(--text1)">₩${total.toLocaleString()}</td>
+          <td colspan="4"></td>
         </tr></tfoot>
       </table>
     </div>`;
