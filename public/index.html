@@ -212,6 +212,7 @@ tfoot td:first-child{text-align:left}
     </table>
   </div></div>
 
+  <div id="gsKwSection" style="display:none"></div>
   <div class="cr">
     <div class="cc"><div class="cl2">광고비 vs 전환매출 (만원)</div><div style="position:relative;height:155px"><canvas id="ch1"></canvas></div></div>
     <div class="cc"><div class="cl2">주차별 ROAS 추이 (%)</div><div style="position:relative;height:155px"><canvas id="ch2"></canvas></div></div>
@@ -258,6 +259,7 @@ const PLATFORMS=[
   {key:'ohouse',    name:'오늘의집 CPC',  type:'excel'},
   {key:'ali',       name:'알리 CPC',      type:'excel'},
   {key:'ezwel',     name:'이지웰',         type:'auto'},
+  {key:'gs_kw',     name:'GS 키워드',       type:'auto'},
 ];
 
 const SK='oa_ad_weekly_data_v2';
@@ -317,6 +319,7 @@ function load(){
         if(!D[wk])D[wk]={label:val.label,platforms:{}};
         // platforms 병합: Supabase 값 우선, 없는 키는 기존 유지
         D[wk].platforms=Object.assign({},D[wk].platforms||{},val.platforms||{});
+        if(val.gsKeywords?.length)D[wk].gsKeywords=val.gsKeywords;
         D[wk].label=val.label||D[wk].label;
       });
       const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
@@ -338,7 +341,7 @@ function save(){
   const doSave=()=>{
     const body={};
     Object.entries(D).filter(([k])=>/^\d{4}-W\d{2}$/.test(k)).forEach(([k,v])=>{
-      body[k]={label:v.label||'',platforms:v.platforms||{}};
+      body[k]={label:v.label||'',platforms:v.platforms||{},gsKeywords:v.gsKeywords||[]};
     });
     fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(r=>r.json())
@@ -766,6 +769,7 @@ function openCollectModal(){
     {key:'lotte_ai', name:'롯데ON AI',  url:'https://ad.lotteon.com/advRpt/advSadRptDay'},
     {key:'lotte_cpc',name:'롯데ON CPC', url:'https://ad.lotteon.com/advRpt/advClickRptDay'},
     {key:'ezwel', name:'이지웰',        url:'https://admarket.ezwel.com/console/report/adReport'},
+    {key:'gs_kw', name:'GS 키워드',     url:'https://partners.gsshop.com'},
   ];
 
   const existing=document.getElementById('collectModal');
@@ -824,6 +828,16 @@ saveGsKeywords("${weekKey}", [{period:"노출기간", keyword:"키워드", produ
     prompt+=`
 
 이지웰 ROAS→전환매출 계산: sales = Math.round(adCost * roas / 100)
+
+━━━ GS 키워드 광고 ━━━
+【GS 키워드】 https://partners.gsshop.com → 광고센터 > 키워드 광고 > 키워드 광고 관리
+  - 조회기간 ${L}~${H} 설정 후 검색
+  - 노출승인 행에서: 광고노출기간, 최종승인키워드, 상품명, 계약금액 파싱
+  - 수집 후 대시보드 탭 콘솔에서:
+saveGsKeywords("${weekKey}", [
+  {period:"광고노출기간", keyword:"키워드명", product:"상품명", amount:금액숫자},
+  ...
+]);
 
 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
     return prompt;
@@ -895,6 +909,51 @@ saveGsKeywords("${weekKey}", [{period:"노출기간", keyword:"키워드", produ
 
 async function startCollect(){
   openCollectModal();
+}
+
+function saveGsKeywords(weekKey, keywords){
+  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
+  D[weekKey].gsKeywords=keywords||[];
+  save();renderAll();
+  toast('GS 키워드 '+keywords.length+'개 저장 완료','ok');
+}
+window.saveGsKeywords=saveGsKeywords;
+
+function renderGsKeywords(wks){
+  const el=document.getElementById('gsKwSection');
+  if(!el)return;
+  const allKws=[];
+  (wks||[]).forEach(wk=>{(D[wk]?.gsKeywords||[]).forEach(k=>allKws.push({...k,wk}));});
+  if(!allKws.length){el.style.display='none';return;}
+  const total=allKws.reduce((s,k)=>s+(k.amount||0),0);
+  el.style.display='block';
+  el.innerHTML=`
+    <div style="margin:14px 0 8px;font-size:13px;font-weight:500;color:var(--text1);display:flex;align-items:center;gap:6px">
+      🏷️ GS홈쇼핑 키워드 광고
+      <span style="font-size:11px;color:var(--text2);font-weight:400">(${wks.map(w=>wkLbl(w)).join(', ')})</span>
+    </div>
+    <div style="background:var(--card);border:.5px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 12px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">광고노출기간</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">키워드</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">상품명</th>
+          <th style="padding:8px 12px;text-align:center;color:var(--text2);font-weight:500;border-bottom:.5px solid var(--border)">계약금액</th>
+        </tr></thead>
+        <tbody>
+          ${allKws.map(k=>`<tr style="border-bottom:.5px solid var(--border)">
+            <td style="padding:7px 12px;text-align:center;color:var(--text2);font-size:11px">${k.period||'-'}</td>
+            <td style="padding:7px 12px;text-align:center;color:var(--text1)">${k.keyword||'-'}</td>
+            <td style="padding:7px 12px;text-align:center;color:var(--text2);font-size:11px">${k.product||'-'}</td>
+            <td style="padding:7px 12px;text-align:center;color:var(--text1)">₩${(k.amount||0).toLocaleString()}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:var(--bg)">
+          <td colspan="3" style="padding:8px 12px;font-weight:500;color:var(--text1)">합계 (${allKws.length}개)</td>
+          <td style="padding:8px 12px;text-align:center;font-weight:500;color:var(--text1)">₩${total.toLocaleString()}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
 }
 
 function saveLotteon(weekKey,ai,cpc){
@@ -1031,6 +1090,7 @@ function drawCharts(sWks){
       pointRadius:wks.map(w=>sWks.includes(w)?5:3),tension:0.3,fill:true}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
     scales:{x:{ticks:{font:{size:9},autoSkip:true,maxRotation:0},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}}}}});}
+  renderGsKeywords(sWks);
 }
 
 /* ── 직접입력 모달 ── */
