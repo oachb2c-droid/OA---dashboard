@@ -752,8 +752,11 @@ savePlatformData("${weekKey}", "platformKey", {adCost:숫자, sales:숫자, impr
 【5. 롯데ON AI】 https://ad.lotteon.com/advRpt/advSadRptDay → "lotte_ai"
 【6. 롯데ON CPC】 https://ad.lotteon.com/advRpt/advClickRptDay → "lotte_cpc"
 【7. 이지웰】 https://admarket.ezwel.com/console/report/adReport → "ezwel"
-  - 광고리포트 > 광고주 종합 리포트 > 검색광고 체크 > 날짜 조회
-  - 이지웰 전환매출 계산: sales = Math.round(adCost * roas / 100)
+  - 광고리포트 > 광고주 종합 리포트 클릭
+  - 상단 필터에서 '검색광고' 체크 (다른 광고유형은 체크 해제)
+  - 기간 ${L}~${H} 설정 후 데이터 조회 클릭
+  - 합계행에서 광고비, 노출수, 클릭수, CTR, ROAS 파싱
+  - 전환매출 계산: sales = Math.round(adCost * roas / 100)
 
 모두 완료 후 대시보드 화면 업데이트 확인해줘.`;
 }
