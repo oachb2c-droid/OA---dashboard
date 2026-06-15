@@ -315,11 +315,11 @@ function load(){
     fetch('/api/data').then(r=>r.json()).then(data=>{
       // Supabase 데이터로 덮어쓰기 (병합)
       Object.entries(data||{}).forEach(([wk,val])=>{
-        if(!D[wk])D[wk]={label:val.label,platforms:{}};
+        if(!D[wk])D[wk]={label:val.label||wkLbl(wk),platforms:{}};
         // platforms 병합: Supabase 값 우선, 없는 키는 기존 유지
         D[wk].platforms=Object.assign({},D[wk].platforms||{},val.platforms||{});
         if(val.gsKeywords?.length)D[wk].gsKeywords=val.gsKeywords;
-        D[wk].label=val.label||D[wk].label;
+        D[wk].label=val.label||D[wk].label||wkLbl(wk);
       });
       const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
       if(!curWk||!D[curWk])curWk=wks[wks.length-1];
@@ -1087,7 +1087,7 @@ function drawCharts(sWks){
   const wks=Object.keys(D).sort();
   const e2=document.getElementById('ch2');
   if(e2){c2=new Chart(e2,{type:'line',data:{
-    labels:wks.map(w=>D[w].label.split('~')[0]),
+    labels:wks.map(w=>(D[w].label||wkLbl(w)).split('~')[0]),
     datasets:[{label:'ROAS',data:wks.map(w=>totWk(w)?.roas||0),
       borderColor:'#7F77DD',backgroundColor:'rgba(127,119,221,0.07)',
       pointBackgroundColor:wks.map(w=>sWks.includes(w)?'#D85A30':'#7F77DD'),
