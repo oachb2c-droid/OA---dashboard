@@ -42,14 +42,14 @@ app.get('/api/data', async (req, res) => {
   const { data, error } = await supabase.from('ad_data').select('*').order('week_key');
   if (error) return res.status(500).json({ error: error.message });
   const result = {};
-  data.forEach(row => { result[row.week_key] = { label: row.label, platforms: row.platforms, gsKeywords: row.gs_keywords||[] }; });
+  data.forEach(row => { result[row.week_key] = { label: row.label, platforms: row.platforms, gsKeywords: row.gs_keywords||[], notes: row.notes||{} }; });
   res.json(result);
 });
 
 // 데이터 저장
 app.post('/api/data', async (req, res) => {
   const rows = Object.entries(req.body).map(([week_key, val]) => ({
-    week_key, label: val.label, platforms: val.platforms, gs_keywords: val.gsKeywords||[], updated_at: new Date().toISOString()
+    week_key, label: val.label, platforms: val.platforms, gs_keywords: val.gsKeywords||[], notes: val.notes||{}, updated_at: new Date().toISOString()
   }));
   const { error } = await supabase.from('ad_data').upsert(rows);
   if (error) return res.status(500).json({ error: error.message });
