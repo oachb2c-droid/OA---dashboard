@@ -916,6 +916,29 @@ async function startCollect(){
   openCollectModal();
 }
 
+function savePlatformData(weekKey, platformKey, data){
+  if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{},gsKeywords:[],notes:{}};
+  if(!D[weekKey].platforms)D[weekKey].platforms={};
+  // ROAS 자동계산 (없을 때)
+  const ac=data.adCost||0, sa=data.sales||0;
+  let roas=data.roas;
+  if((roas==null||roas===0)&&ac>0&&sa>0)roas=Math.round(sa/ac*100);
+  // CPC 자동계산
+  let cpc=data.cpc;
+  if((cpc==null||cpc===0)&&ac>0&&data.clicks>0)cpc=Math.round(ac/data.clicks);
+  // CTR 자동계산
+  let ctr=data.ctr;
+  if((ctr==null||ctr===0)&&data.clicks>0&&data.impressions>0)ctr=parseFloat((data.clicks/data.impressions*100).toFixed(2));
+  D[weekKey].platforms[platformKey]={
+    adCost:ac, sales:sa, roas:roas||0,
+    impressions:data.impressions||0, clicks:data.clicks||0,
+    cpc:cpc||null, ctr:ctr!=null?ctr:null
+  };
+  save();renderAll();
+  toast(platformKey+' '+weekKey+' 저장 완료','ok');
+}
+window.savePlatformData=savePlatformData;
+
 function saveGsKeywords(weekKey, keywords){
   if(!D[weekKey])D[weekKey]={label:wkLbl(weekKey),platforms:{}};
   D[weekKey].gsKeywords=keywords||[];
