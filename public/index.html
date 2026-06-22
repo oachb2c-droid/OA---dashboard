@@ -319,6 +319,7 @@ function load(){
         // platforms 병합: Supabase 값 우선, 없는 키는 기존 유지
         D[wk].platforms=Object.assign({},D[wk].platforms||{},val.platforms||{});
         if(val.gsKeywords?.length)D[wk].gsKeywords=val.gsKeywords;
+        if(val.notes)D[wk].notes=val.notes;
         D[wk].label=val.label||D[wk].label||wkLbl(wk);
       });
       const wks=Object.keys(D).filter(k=>/^\d{4}-W\d{2}$/.test(k)).sort();
@@ -340,7 +341,7 @@ function save(){
   const doSave=()=>{
     const body={};
     Object.entries(D).filter(([k])=>/^\d{4}-W\d{2}$/.test(k)).forEach(([k,v])=>{
-      body[k]={label:v.label||'',platforms:v.platforms||{},gsKeywords:v.gsKeywords||[]};
+      body[k]={label:v.label||'',platforms:v.platforms||{},gsKeywords:v.gsKeywords||[],notes:v.notes||{}};
     });
     fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(r=>r.json())
@@ -981,6 +982,12 @@ function sortTable(field){
   });
   renderAll();
 }
+function noteTag(pKey){
+  const note=(D[curWk]?.notes?.[pKey])||'';
+  if(!note)return '<span style="color:var(--text3,#999);font-size:11px">—</span>';
+  return `<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:3px 9px;border-radius:5px;display:inline-block">${note.replace(/</g,'&lt;')}</span>`;
+}
+
 function renderAll(){
   const sWks=rS&&rE?rngWks(lo(),hi()):[curWk];
   const tot=totRng(sWks);
@@ -1036,7 +1043,7 @@ function renderAll(){
     <th onclick="sortTable('clicks')" style="cursor:pointer">클릭수 <span id="sort_clicks">⇅</span></th>
     <th onclick="sortTable('cpc')" style="cursor:pointer">평균CPC <span id="sort_cpc">⇅</span></th>
     <th onclick="sortTable('ctr')" style="cursor:pointer">평균CTR <span id="sort_ctr">⇅</span></th>
-    <th>수집</th>
+    <th style="text-align:left;min-width:160px">특이사항</th>
   </tr>`;
 
   const _sorted=[...PLATFORMS].sort((a,b)=>{
@@ -1050,7 +1057,7 @@ function renderAll(){
     const pd=pTot(p.key,sWks);
     const ppd=prevPlt[p.key];
     const [bc,bl]=p.type==='lotteon'?['blo2','자동(롯데)']:p.type==='toss'?['bto','엑셀업로드']:p.type==='excel'?['boh','엑셀업로드']:p.type==='auto'?['bau','자동']:['bna','대기'];
-    if(!pd)return`<tr><td>${p.name}</td><td>-</td><td class="pv">-</td><td><span class="badge bna">-</span></td><td class="pv">-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="badge ${bc}">${bl}</span></td></tr>`;
+    if(!pd)return`<tr><td>${p.name}</td><td>-</td><td class="pv">-</td><td><span class="badge bna">-</span></td><td class="pv">-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td style="text-align:left">${noteTag(p.key)}</td></tr>`;
     const ctr=pd.ctr!=null?pd.ctr:(pd.clicks&&pd.impressions?parseFloat((pd.clicks/pd.impressions*100).toFixed(2)):null);
     const cpc=pd.cpc!=null?pd.cpc:(pd.clicks&&pd.adCost?Math.round(pd.adCost/pd.clicks):null);
     return`<tr>
@@ -1062,7 +1069,7 @@ function renderAll(){
       <td>${fw(pd.sales)}</td><td>${fw(pd.impressions)}</td><td>${fw(pd.clicks)}</td>
       <td>${cpc!=null?fw(cpc):'-'}</td>
       <td>${ctr!=null?ctr.toFixed(2)+'%':'-'}</td>
-      <td><span class="badge ${bc}">${bl}</span></td>
+      <td style="text-align:left">${noteTag(p.key)}</td>
     </tr>`;
   }).join('');
 
@@ -1113,17 +1120,22 @@ function openModal(){
       <div class="fr"><label>노출수</label><input type="number" id="fi_${p.key}_im" value="${pd?.impressions??''}"></div>
       <div class="fr"><label>클릭수</label><input type="number" id="fi_${p.key}_cl" value="${pd?.clicks??''}"></div>
       <div class="fr"><label>평균CPC(원)</label><input type="number" id="fi_${p.key}_cp" value="${pd?.cpc??''}"></div>
-    </div>`;
+    </div>
+    <div style="margin:5px 0 3px"><label style="font-size:10px;color:#854F0B;display:block;margin-bottom:3px">📝 특이사항</label><input type="text" id="fi_${p.key}_note" value="${(cur?.notes?.[p.key]||'').replace(/"/g,'&quot;')}" placeholder="특이사항 입력 (예: 예산 조정, 신상품)" style="width:100%;border:.5px solid #FAC775;border-radius:6px;padding:6px 9px;font-size:11px;background:#FAEEDA;color:#633806"></div>`;
   }).join('');
   document.getElementById('mo').classList.add('open');
 }
 function closeModal(){document.getElementById('mo').classList.remove('open');}
 function saveModal(){
   const platforms={};
+  const notes={};
   PLATFORMS.forEach(p=>{
     const g=s=>{const el=document.getElementById(s);return el?parseFloat(el.value):NaN;};
     const ac=g(`fi_${p.key}_ac`),sa=g(`fi_${p.key}_sa`),ro=g(`fi_${p.key}_ro`);
     const im=g(`fi_${p.key}_im`),cl=g(`fi_${p.key}_cl`),cp=g(`fi_${p.key}_cp`);
+    // 특이사항 수집
+    const noteEl=document.getElementById(`fi_${p.key}_note`);
+    if(noteEl&&noteEl.value.trim())notes[p.key]=noteEl.value.trim();
     if(!isNaN(ac)||!isNaN(sa)){
       platforms[p.key]={
         adCost:isNaN(ac)?null:ac,sales:isNaN(sa)?null:sa,
@@ -1134,7 +1146,7 @@ function saveModal(){
       };
     }else{platforms[p.key]=D[curWk]?.platforms[p.key]||null;}
   });
-  D[curWk]={label:wkLbl(curWk),platforms};
+  D[curWk]={label:wkLbl(curWk),platforms,notes,gsKeywords:D[curWk]?.gsKeywords||[]};
   save();closeModal();renderAll();toast('저장 완료','ok');
 }
 
